@@ -80,6 +80,12 @@ private: // virtual methods
   // (which must be at least that big). Throws an exception if
   // more bytes are requested than can be retrieved.
   virtual void readImpl(void* buf, size_t nbytes) = 0;
+
+  // By default a blob is returned as an independent object owning
+  // its own buffer. However, the function readBlobImpl() can be
+  // overriden so that it returns a blob referring to arbitrary
+  // pre-existing memory.
+  virtual Blob readBlobImpl(size_t size);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -102,9 +108,7 @@ inline
 IDataStream::Blob
 IDataStream::readBlob(size_t size)
 {
-  std::shared_ptr<char> buf(new char[size], std::default_delete<char[]>());
-  readImpl(buf.get(), size);
-  return Blob(buf, size);
+  return readBlobImpl(size);
 }
 
 } // namespace zim
