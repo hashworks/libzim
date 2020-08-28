@@ -52,7 +52,7 @@ TEST(IDataStream, readBlob)
   InfiniteZeroStream izs;
   IDataStream& ids = izs;
   const IDataStream::Blob blob = ids.readBlob(N);
-  EXPECT_EQ(0, memcmp(blob.get(), zerobuf, N));
+  EXPECT_EQ(0, memcmp(blob.data(), zerobuf, N));
 }
 
 } // unnamed namespace

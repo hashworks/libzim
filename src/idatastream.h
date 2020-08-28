@@ -46,8 +46,21 @@ namespace zim
 class IDataStream
 {
 public: // types
-  // XXX: A size-aware blob should be better
-  typedef std::unique_ptr<char[]> Blob;
+  class Blob
+  {
+  private: // types
+    typedef std::shared_ptr<const char> DataPtr;
+
+  public: // functions
+    Blob(const DataPtr& data, size_t size) : data_(data) , size_(size) {}
+
+    const char* data() const { return data_.get(); }
+    size_t size() const { return size_; }
+
+  private: // data
+    DataPtr data_;
+    size_t size_;
+  };
 
 public: // functions
   virtual ~IDataStream() {}
@@ -89,9 +102,9 @@ inline
 IDataStream::Blob
 IDataStream::readBlob(size_t size)
 {
-  Blob blob(new char[size]);
-  readImpl(blob.get(), size);
-  return blob;
+  std::shared_ptr<char> buf(new char[size], std::default_delete<char[]>());
+  readImpl(buf.get(), size);
+  return Blob(buf, size);
 }
 
 } // namespace zim
