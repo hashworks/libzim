@@ -110,7 +110,7 @@ getClusterReader(const Reader& zimReader, offset_t offset, CompressionType* comp
     std::shared_ptr<const Reader> reader = getClusterReader(zimReader, clusterOffset, &comp, &extended);
     return (comp == zimcompDefault || comp == zimcompNone)
          ? std::make_shared<Cluster>(reader, extended)
-         : std::make_shared<CompressedCluster>(reader, comp, extended);
+         : std::make_shared<CompressedCluster>(std::make_shared<ReaderDataStreamWrapper>(reader.get()), comp, extended);
   }
 
   Cluster::Cluster(std::shared_ptr<const Reader> reader_, bool isExtended)
@@ -229,20 +229,19 @@ Blob idsBlob2zimBlob(const IDataStream::Blob& blob, size_t offset, size_t size)
 
 } // unnamed namespace
 
-CompressedCluster::CompressedCluster(std::shared_ptr<const Reader> reader, CompressionType comp, bool isExtended)
+CompressedCluster::CompressedCluster(std::shared_ptr<IDataStream> ds, CompressionType comp, bool isExtended)
   : Cluster(isExtended)
   , compression_(comp)
 {
   ASSERT(compression_, >, zimcompNone);
 
-  ReaderDataStreamWrapper rdsw(reader.get());
 
   if ( isExtended )
-    readHeader<uint64_t>(rdsw);
+    readHeader<uint64_t>(*ds);
   else
-    readHeader<uint32_t>(rdsw);
+    readHeader<uint32_t>(*ds);
 
-  readBlobs(rdsw);
+  readBlobs(*ds);
 }
 
 bool

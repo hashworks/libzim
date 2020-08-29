@@ -84,7 +84,7 @@ namespace zim
   class CompressedCluster : public Cluster
   {
     public: // functions
-      CompressedCluster(std::shared_ptr<const Reader> reader, CompressionType comp, bool isExtended);
+      CompressedCluster(std::shared_ptr<IDataStream> ds, CompressionType comp, bool isExtended);
 
       bool isCompressed() const override;
       CompressionType getCompression() const override;
