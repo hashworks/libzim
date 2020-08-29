@@ -108,13 +108,19 @@ getClusterReader(const Reader& zimReader, offset_t offset, CompressionType* comp
     CompressionType comp;
     bool extended;
     std::shared_ptr<const Reader> reader = getClusterReader(zimReader, clusterOffset, &comp, &extended);
-    return (comp == zimcompDefault || comp == zimcompNone)
-         ? std::make_shared<Cluster>(reader, extended)
-         : std::make_shared<CompressedCluster>(std::make_shared<ReaderDataStreamWrapper>(reader.get()), comp, extended);
+    if (comp == zimcompDefault || comp == zimcompNone)
+      return std::make_shared<NonCompressedCluster>(reader, extended);
+
+    const auto rdsw = std::make_shared<ReaderDataStreamWrapper>(reader.get());
+    return std::make_shared<CompressedCluster>(rdsw, comp, extended);
   }
 
-  Cluster::Cluster(std::shared_ptr<const Reader> reader_, bool isExtended)
-    : isExtended(isExtended),
+////////////////////////////////////////////////////////////////////////////////
+// NonCompressedCluster
+////////////////////////////////////////////////////////////////////////////////
+
+  NonCompressedCluster::NonCompressedCluster(std::shared_ptr<const Reader> reader_, bool isExtended)
+    : Cluster(isExtended),
       reader(reader_),
       startOffset(0)
   {
@@ -131,7 +137,7 @@ getClusterReader(const Reader& zimReader, offset_t offset, CompressionType* comp
 
   /* This return the number of char read */
   template<typename OFFSET_TYPE>
-  offset_t Cluster::read_header()
+  offset_t NonCompressedCluster::read_header()
   {
     // read first offset, which specifies, how many offsets we need to read
     OFFSET_TYPE offset = reader->read_uint<OFFSET_TYPE>(offset_t(0));
@@ -159,7 +165,7 @@ getClusterReader(const Reader& zimReader, offset_t offset, CompressionType* comp
     return data_address;
   }
 
-  Blob Cluster::getBlob(blob_index_t n) const
+  Blob NonCompressedCluster::getBlob(blob_index_t n) const
   {
     if (n < count()) {
       auto blobSize = getBlobSize(n);
@@ -173,7 +179,7 @@ getClusterReader(const Reader& zimReader, offset_t offset, CompressionType* comp
     }
   }
 
-  Blob Cluster::getBlob(blob_index_t n, offset_t offset, zsize_t size) const
+  Blob NonCompressedCluster::getBlob(blob_index_t n, offset_t offset, zsize_t size) const
   {
     if (n < count()) {
       const auto blobSize = getBlobSize(n);
@@ -256,6 +262,19 @@ CompressedCluster::getCompression() const
   return compression_;
 }
 
+blob_index_t
+CompressedCluster::count() const
+{
+  return blob_index_t(blobSizes_.size());
+}
+
+zsize_t
+CompressedCluster::getBlobSize(blob_index_t n) const
+{
+  ASSERT(n.v, <, blobSizes_.size());
+  return zsize_t(blobSizes_[n.v]);
+}
+
 offset_t
 CompressedCluster::getBlobOffset(blob_index_t n) const
 {
@@ -266,23 +285,17 @@ template<typename OFFSET_TYPE>
 void
 CompressedCluster::readHeader(IDataStream& ds)
 {
-  startOffset = offset_t(ds.read<OFFSET_TYPE>());
+  OFFSET_TYPE offset = ds.read<OFFSET_TYPE>();
 
-  size_t n_offset = startOffset.v / sizeof(OFFSET_TYPE);
+  size_t n_offset = offset / sizeof(OFFSET_TYPE);
 
-  // read offsets
-  offsets.clear();
-  offsets.reserve(n_offset);
-  offsets.push_back(offset_t(0));
-
-  OFFSET_TYPE offset = startOffset.v;
   while (--n_offset)
   {
     OFFSET_TYPE new_offset = ds.read<OFFSET_TYPE>();
     ASSERT(new_offset, >=, offset);
 
+    blobSizes_.push_back(new_offset - offset);
     offset = new_offset;
-    offsets.push_back(offset_t(offset - startOffset.v));
   }
 }
 
