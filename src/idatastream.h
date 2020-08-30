@@ -75,6 +75,11 @@ public: // functions
   // Reads a blob of the specified size from the stream
   Blob readBlob(size_t size);
 
+  // Reads exactly 'nbytes' bytes into the provided buffer 'buf'
+  // (which must be at least that big). Throws an exception if
+  // more bytes are requested than can be retrieved.
+  void read(void* buf, size_t nbytes) { readImpl(buf, nbytes); }
+
 private: // virtual methods
   // Reads exactly 'nbytes' bytes into the provided buffer 'buf'
   // (which must be at least that big). Throws an exception if
